@@ -151,6 +151,13 @@ export default function Projects() {
               >
                 View Tasks
               </button>
+
+              <button
+                onClick={() => navigate(`/projects/${p._id}/kanban`)}
+                className="text-purple-600"
+              >
+                Kanban Board
+              </button>
             </div>
           </div>
         ))}

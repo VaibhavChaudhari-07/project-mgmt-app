@@ -64,6 +64,12 @@ export default function ProjectTasks() {
     setAssignee(task.assignee?._id || "");
   };
 
+  // ✅ NEW: status change handler
+  const handleStatusChange = async (taskId, newStatus) => {
+    await updateTask(taskId, { status: newStatus });
+    loadTasks();
+  };
+
   return (
     <div>
       <h2 className="text-xl mb-3">Tasks</h2>
@@ -113,6 +119,7 @@ export default function ProjectTasks() {
         <thead>
           <tr className="bg-gray-200">
             <th className="border p-2">Title</th>
+            <th className="border p-2">Status</th>
             <th className="border p-2">Priority</th>
             <th className="border p-2">Assignee</th>
             <th className="border p-2">Actions</th>
@@ -122,10 +129,28 @@ export default function ProjectTasks() {
           {tasks.map((t) => (
             <tr key={t._id}>
               <td className="border p-2">{t.title}</td>
+
+              {/* ✅ Status dropdown */}
+              <td className="border p-2">
+                <select
+                  className="border p-1"
+                  value={t.status}
+                  onChange={(e) =>
+                    handleStatusChange(t._id, e.target.value)
+                  }
+                >
+                  <option value="todo">To Do</option>
+                  <option value="inprogress">In Progress</option>
+                  <option value="review">Review</option>
+                  <option value="done">Done</option>
+                </select>
+              </td>
+
               <td className="border p-2">{t.priority}</td>
               <td className="border p-2">
                 {t.assignee?.name || "-"}
               </td>
+
               <td className="border p-2 flex gap-2">
                 <button
                   onClick={() => startEdit(t)}
