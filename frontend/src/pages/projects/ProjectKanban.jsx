@@ -21,10 +21,7 @@ function Column({ id, title, tasks }) {
   const { setNodeRef } = useDroppable({ id });
 
   return (
-    <div
-      ref={setNodeRef}
-      className="bg-gray-100 p-2 rounded min-h-[400px]"
-    >
+    <div ref={setNodeRef} className="bg-gray-100 p-2 rounded min-h-[400px]">
       <h3 className="text-center font-bold mb-2">{title}</h3>
 
       <SortableContext
@@ -58,7 +55,9 @@ function TaskCard({ task }) {
     >
       <div className="font-semibold">{task.title}</div>
       <div className="text-xs text-gray-500">
-        {task.assignee?.name || "Unassigned"}
+        {task.assignees?.length
+          ? task.assignees.map((u) => u.name).join(", ")
+          : "Unassigned"}
       </div>
     </div>
   );
@@ -77,8 +76,7 @@ export default function ProjectKanban() {
     loadTasks();
   }, [projectId]);
 
-  const grouped = (status) =>
-    tasks.filter((t) => t.status === status);
+  const grouped = (status) => tasks.filter((t) => t.status === status);
 
   const handleDragEnd = async (event) => {
     const { active, over } = event;

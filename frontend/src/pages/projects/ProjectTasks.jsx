@@ -7,6 +7,7 @@ import {
   updateTask,
 } from "../../services/task.service";
 import { getProjectById } from "../../services/project.service";
+import { getTeams } from "../../services/team.service";
 
 export default function ProjectTasks() {
   const { projectId } = useParams();
@@ -16,12 +17,16 @@ export default function ProjectTasks() {
 
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState("medium");
-  const [assignee, setAssignee] = useState("");
+  const [selectedAssignees, setSelectedAssignees] = useState([]);
   const [editTaskId, setEditTaskId] = useState(null);
+
+  const [teams, setTeams] = useState([]);
+  const [openTeamId, setOpenTeamId] = useState(null);
+  const [openDropdown, setOpenDropdown] = useState(false);
 
   const loadTasks = async () => {
     const res = await getTasks(projectId);
-    setTasks(res.data);
+    setTasks(res.data || []);
   };
 
   const loadMembers = async () => {
@@ -29,9 +34,15 @@ export default function ProjectTasks() {
     setMembers(res.data.members || []);
   };
 
+  const loadTeams = async () => {
+    const res = await getTeams();
+    setTeams(res.data || []);
+  };
+
   useEffect(() => {
     loadTasks();
     loadMembers();
+    loadTeams();
   }, [projectId]);
 
   const handleSave = async () => {
@@ -40,7 +51,7 @@ export default function ProjectTasks() {
     const payload = {
       title,
       priority,
-      assignee: assignee || null,
+      assignees: selectedAssignees,
       project: projectId,
     };
 
@@ -53,7 +64,7 @@ export default function ProjectTasks() {
 
     setTitle("");
     setPriority("medium");
-    setAssignee("");
+    setSelectedAssignees([]);
     loadTasks();
   };
 
@@ -61,21 +72,36 @@ export default function ProjectTasks() {
     setEditTaskId(task._id);
     setTitle(task.title);
     setPriority(task.priority);
-    setAssignee(task.assignee?._id || "");
+    setSelectedAssignees(task.assignees?.map((u) => u._id) || []);
   };
 
-  // ✅ NEW: status change handler
   const handleStatusChange = async (taskId, newStatus) => {
     await updateTask(taskId, { status: newStatus });
     loadTasks();
   };
+
+  const toggleMember = (id) => {
+    setSelectedAssignees((prev) =>
+      prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id],
+    );
+  };
+
+  const assignTeam = (team) => {
+    const teamIds = team.members.map((m) => m._id);
+    setSelectedAssignees((prev) => Array.from(new Set([...prev, ...teamIds])));
+  };
+
+  const selectedNames = members
+    .filter((m) => selectedAssignees.includes(m._id))
+    .map((m) => m.name)
+    .join(", ");
 
   return (
     <div>
       <h2 className="text-xl mb-3">Tasks</h2>
 
       {/* Create / Edit task */}
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-4 flex-wrap">
         <input
           className="border p-2"
           placeholder="Task title"
@@ -93,23 +119,68 @@ export default function ProjectTasks() {
           <option value="high">High</option>
         </select>
 
-        <select
-          className="border p-2"
-          value={assignee}
-          onChange={(e) => setAssignee(e.target.value)}
-        >
-          <option value="">Unassigned</option>
-          {members.map((m) => (
-            <option key={m._id} value={m._id}>
-              {m.name}
-            </option>
-          ))}
-        </select>
+        {/* Assignee dropdown */}
+        <div className="relative w-64">
+          <button
+            type="button"
+            onClick={() => setOpenDropdown(!openDropdown)}
+            className="border p-2 w-full text-left bg-white"
+          >
+            {selectedNames || "Assign users ▾"}
+          </button>
 
-        <button
-          onClick={handleSave}
-          className="bg-blue-600 text-white px-3"
-        >
+          {openDropdown && (
+            <div className="absolute z-30 bg-white border w-full mt-1 max-h-64 overflow-y-auto shadow">
+              {/* Teams */}
+              <div className="px-2 py-1 text-xs font-semibold text-gray-500 border-b">
+                Teams
+              </div>
+
+              {teams
+                .filter((t) =>
+                  t.members.every((m) =>
+                    members.some((pm) => pm._id === m._id),
+                  ),
+                )
+                .map((t) => (
+                  <label
+                    key={t._id}
+                    className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 cursor-pointer text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={t.members.every((m) =>
+                        selectedAssignees.includes(m._id),
+                      )}
+                      onChange={() => assignTeam(t)}
+                    />
+                    👥 {t.name}
+                  </label>
+                ))}
+
+              {/* Members */}
+              <div className="px-2 py-1 text-xs font-semibold text-gray-500 border-b mt-2">
+                Members
+              </div>
+
+              {members.map((m) => (
+                <label
+                  key={m._id}
+                  className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 cursor-pointer text-sm"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedAssignees.includes(m._id)}
+                    onChange={() => toggleMember(m._id)}
+                  />
+                  {m.name}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <button onClick={handleSave} className="bg-blue-600 text-white px-3">
           {editTaskId ? "Update" : "Add"}
         </button>
       </div>
@@ -121,7 +192,7 @@ export default function ProjectTasks() {
             <th className="border p-2">Title</th>
             <th className="border p-2">Status</th>
             <th className="border p-2">Priority</th>
-            <th className="border p-2">Assignee</th>
+            <th className="border p-2">Assignees</th>
             <th className="border p-2">Actions</th>
           </tr>
         </thead>
@@ -130,14 +201,11 @@ export default function ProjectTasks() {
             <tr key={t._id}>
               <td className="border p-2">{t.title}</td>
 
-              {/* ✅ Status dropdown */}
               <td className="border p-2">
                 <select
                   className="border p-1"
                   value={t.status}
-                  onChange={(e) =>
-                    handleStatusChange(t._id, e.target.value)
-                  }
+                  onChange={(e) => handleStatusChange(t._id, e.target.value)}
                 >
                   <option value="todo">To Do</option>
                   <option value="inprogress">In Progress</option>
@@ -147,15 +215,15 @@ export default function ProjectTasks() {
               </td>
 
               <td className="border p-2">{t.priority}</td>
+
               <td className="border p-2">
-                {t.assignee?.name || "-"}
+                {t.assignees?.length
+                  ? t.assignees.map((u) => u.name).join(", ")
+                  : "-"}
               </td>
 
               <td className="border p-2 flex gap-2">
-                <button
-                  onClick={() => startEdit(t)}
-                  className="text-blue-600"
-                >
+                <button onClick={() => startEdit(t)} className="text-blue-600">
                   Edit
                 </button>
                 <button

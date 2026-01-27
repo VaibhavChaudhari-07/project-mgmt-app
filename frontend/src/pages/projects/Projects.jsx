@@ -6,143 +6,248 @@ import {
   createProject,
   deleteProject,
   updateProject,
-  addMember,
-  removeMember,
+  updateProjectMembers,
 } from "../../services/project.service";
 
+import { getUsers } from "../../services/user.service";
+import { getTeams } from "../../services/team.service";
+
 export default function Projects() {
-  const navigate = useNavigate(); // ✅ FIX
+  const navigate = useNavigate();
 
   const [projects, setProjects] = useState([]);
+  const [users, setUsers] = useState([]);
+
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [editId, setEditId] = useState(null);
-  const [memberEmail, setMemberEmail] = useState("");
+
+  const [selectedMembers, setSelectedMembers] = useState([]);
+  const [openProjectDropdown, setOpenProjectDropdown] = useState(null);
+
+  const [teams, setTeams] = useState([]);
 
   const loadProjects = async () => {
     const res = await getProjects();
-    setProjects(res.data);
+    setProjects(res.data || []);
+  };
+
+  const loadUsers = async () => {
+    const res = await getUsers();
+    setUsers(res.data || []);
+  };
+
+  const loadTeams = async () => {
+    const res = await getTeams();
+    setTeams(res.data || []);
   };
 
   useEffect(() => {
     loadProjects();
+    loadUsers();
+    loadTeams();
   }, []);
 
   const handleSave = async () => {
-    if (!name) return alert("Project name required");
+    if (!name.trim()) return alert("Project name required");
 
-    if (editId) {
-      await updateProject(editId, { name, description });
-      setEditId(null);
-    } else {
-      await createProject({ name, description });
+    try {
+      if (editId) {
+        await updateProject(editId, { name, description });
+        await updateProjectMembers(editId, selectedMembers);
+        setEditId(null);
+      } else {
+        const res = await createProject({ name, description });
+
+        const newProjectId = res?.data?._id;
+        if (newProjectId && selectedMembers.length > 0) {
+          await updateProjectMembers(newProjectId, selectedMembers);
+        }
+      }
+
+      setName("");
+      setDescription("");
+      setSelectedMembers([]);
+
+      await loadProjects(); // IMPORTANT
+    } catch (err) {
+      console.error("Project save failed:", err);
+      alert("Failed to save project");
     }
-
-    setName("");
-    setDescription("");
-    loadProjects();
   };
 
   const startEdit = (project) => {
     setEditId(project._id);
     setName(project.name);
     setDescription(project.description || "");
+    setSelectedMembers((project.members || []).map((m) => m._id));
   };
 
-  const handleAddMember = async (projectId) => {
-    if (!memberEmail) return alert("Enter email");
-    await addMember(projectId, memberEmail);
-    setMemberEmail("");
-    loadProjects();
+  const toggleProjectMember = async (projectId, userId) => {
+    const project = projects.find((p) => p._id === projectId);
+    if (!project) return;
+
+    const currentMembers = project.members || [];
+
+    let updatedMembers;
+    if (currentMembers.some((m) => m._id === userId)) {
+      updatedMembers = currentMembers
+        .filter((m) => m._id !== userId)
+        .map((m) => m._id);
+    } else {
+      updatedMembers = [...currentMembers.map((m) => m._id), userId];
+    }
+
+    await updateProjectMembers(projectId, updatedMembers);
+    await loadProjects();
   };
 
-  const handleRemoveMember = async (projectId, userId) => {
-    await removeMember(projectId, userId);
-    loadProjects();
+  const assignTeamToProject = async (projectId, team) => {
+    const project = projects.find((p) => p._id === projectId);
+    if (!project) return;
+
+    const currentMembers = (project.members || []).map((m) => m._id);
+    const teamMemberIds = team.members.map((m) => m._id);
+
+    const merged = Array.from(new Set([...currentMembers, ...teamMemberIds]));
+
+    await updateProjectMembers(projectId, merged);
+    await loadProjects();
   };
+
+  const initials = (name) =>
+    name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase();
 
   return (
     <div>
       <h1 className="text-2xl mb-4">Projects</h1>
 
-      {/* Create / Edit */}
-      <div className="mb-4 flex gap-2">
-        <input
-          className="border p-2"
-          placeholder="Project name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <input
-          className="border p-2"
-          placeholder="Description"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-        />
-        <button onClick={handleSave} className="bg-blue-600 text-white px-3">
-          {editId ? "Update" : "Add"}
-        </button>
+      {/* Create / Edit Project */}
+      <div className="mb-4 space-y-2">
+        <div className="flex gap-2">
+          <input
+            className="border p-2"
+            placeholder="Project name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+
+          <input
+            className="border p-2"
+            placeholder="Description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+
+          <button onClick={handleSave} className="bg-blue-600 text-white px-3">
+            {editId ? "Update" : "Add"}
+          </button>
+        </div>
       </div>
 
       {/* Project list */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {projects.map((p) => (
-          <div key={p._id} className="border p-3 rounded shadow">
-            <h2 className="font-bold">{p.name}</h2>
-            <p className="text-sm mb-2">{p.description}</p>
+          <div key={p._id} className="border p-3 rounded shadow relative">
+            <div className="flex justify-between items-start">
+              <div>
+                <h2 className="font-bold">{p.name}</h2>
+                <p className="text-sm mb-2">{p.description}</p>
+              </div>
 
-            {/* Actions */}
-            <div className="flex gap-3 mb-2">
-              <button onClick={() => startEdit(p)} className="text-blue-600">
-                Edit
-              </button>
-              <button
-                onClick={() => deleteProject(p._id).then(loadProjects)}
-                className="text-red-600"
-              >
-                Delete
-              </button>
+              {/* Members dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() =>
+                    setOpenProjectDropdown(
+                      openProjectDropdown === p._id ? null : p._id,
+                    )
+                  }
+                  className="border px-2 py-1 text-sm bg-white"
+                >
+                  Members ▾
+                </button>
+
+                {openProjectDropdown === p._id && (
+                  <div className="absolute right-0 mt-1 w-60 bg-white border shadow z-20 max-h-60 overflow-y-auto">
+                    {/* Teams section */}
+                    <div className="px-2 py-1 text-xs font-semibold text-gray-500 border-b">
+                      Teams
+                    </div>
+
+                    {teams.map((t) => {
+                      const allTeamMembersSelected = t.members.every((tm) =>
+                        (p.members || []).some((pm) => pm._id === tm._id),
+                      );
+
+                      return (
+                        <label
+                          key={t._id}
+                          className="flex items-center gap-2 px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={allTeamMembersSelected}
+                            onChange={() => assignTeamToProject(p._id, t)}
+                          />
+                          👥 {t.name}
+                        </label>
+                      );
+                    })}
+
+                    {/* Members section */}
+                    <div className="px-2 py-1 text-xs font-semibold text-gray-500 border-b mt-2">
+                      Members
+                    </div>
+
+                    {users.map((u) => (
+                      <label
+                        key={u._id}
+                        className="flex items-center gap-2 p-2 hover:bg-gray-100 cursor-pointer text-sm"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={(p.members || []).some(
+                            (m) => m._id === u._id,
+                          )}
+                          onChange={() => toggleProjectMember(p._id, u._id)}
+                        />
+                        {u.name}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Members list */}
-            <div className="mb-2">
-              <h3 className="font-semibold">Members:</h3>
-
-              {p.members.length === 0 && (
-                <p className="text-sm text-gray-500">No members</p>
-              )}
-
-              {p.members.map((m) => (
+            {/* Member badges */}
+            <div className="flex gap-2 my-2 flex-wrap">
+              {(p.members || []).map((m) => (
                 <div
                   key={m._id}
-                  className="flex justify-between items-center text-sm border-b py-1"
+                  className="w-7 h-7 rounded-full bg-purple-600 text-white flex items-center justify-center text-xs font-bold"
+                  title={m.name}
                 >
-                  <span>
-                    {m.name} ({m.email})
-                  </span>
-                  <button
-                    onClick={() => handleRemoveMember(p._id, m._id)}
-                    className="text-red-500"
-                  >
-                    ❌
-                  </button>
+                  {initials(m.name)}
                 </div>
               ))}
             </div>
 
-            {/* Add member + view tasks */}
-            <div className="flex gap-2 mt-2">
-              <input
-                className="border p-1 flex-1"
-                placeholder="Member email"
-                value={memberEmail}
-                onChange={(e) => setMemberEmail(e.target.value)}
-              />
+            {/* Actions */}
+            <div className="flex gap-3 mt-2">
+              <button onClick={() => startEdit(p)} className="text-blue-600">
+                Edit Project
+              </button>
+
               <button
-                onClick={() => handleAddMember(p._id)}
-                className="bg-green-600 text-white px-2"
+                onClick={() => deleteProject(p._id).then(loadProjects)}
+                className="text-red-600"
               >
-                Add
+                Delete Project
               </button>
 
               <button

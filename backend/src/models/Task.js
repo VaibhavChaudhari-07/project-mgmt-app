@@ -14,10 +14,13 @@ const taskSchema = new mongoose.Schema(
       enum: ["low", "medium", "high"],
       default: "medium",
     },
-    assignee: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-    },
+    assignees: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+
     project: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Project",
@@ -28,7 +31,7 @@ const taskSchema = new mongoose.Schema(
       ref: "User",
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 module.exports = mongoose.model("Task", taskSchema);
