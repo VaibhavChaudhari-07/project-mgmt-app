@@ -15,3 +15,5 @@ export const addMember = (id, email) =>
 
 export const removeMember = (id, userId) =>
   api.delete(`/projects/${id}/members/${userId}`);
+
+export const getProjectById = (id) => api.get(`/projects/${id}`);

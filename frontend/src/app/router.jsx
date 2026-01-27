@@ -7,6 +7,8 @@ import Members from "../pages/members/Members";
 import Settings from "../pages/settings/Settings";
 import Login from "../pages/auth/Login";
 import Register from "../pages/auth/Register";
+import ProjectTasks from "../pages/projects/ProjectTasks";
+
 
 
 export const router = createBrowserRouter([
@@ -21,6 +23,8 @@ export const router = createBrowserRouter([
       { path: "projects", element: <Projects /> },
       { path: "members", element: <Members /> },
       { path: "settings", element: <Settings /> },
+      { path: "projects/:projectId/tasks", element: <ProjectTasks /> },
+
     ],
   },
 ]);

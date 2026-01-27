@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+
 import {
   getProjects,
   createProject,
@@ -9,6 +11,8 @@ import {
 } from "../../services/project.service";
 
 export default function Projects() {
+  const navigate = useNavigate(); // ✅ FIX
+
   const [projects, setProjects] = useState([]);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -75,10 +79,7 @@ export default function Projects() {
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
-        <button
-          onClick={handleSave}
-          className="bg-blue-600 text-white px-3"
-        >
+        <button onClick={handleSave} className="bg-blue-600 text-white px-3">
           {editId ? "Update" : "Add"}
         </button>
       </div>
@@ -92,10 +93,7 @@ export default function Projects() {
 
             {/* Actions */}
             <div className="flex gap-3 mb-2">
-              <button
-                onClick={() => startEdit(p)}
-                className="text-blue-600"
-              >
+              <button onClick={() => startEdit(p)} className="text-blue-600">
                 Edit
               </button>
               <button
@@ -132,7 +130,7 @@ export default function Projects() {
               ))}
             </div>
 
-            {/* Add member */}
+            {/* Add member + view tasks */}
             <div className="flex gap-2 mt-2">
               <input
                 className="border p-1 flex-1"
@@ -145,6 +143,13 @@ export default function Projects() {
                 className="bg-green-600 text-white px-2"
               >
                 Add
+              </button>
+
+              <button
+                onClick={() => navigate(`/projects/${p._id}/tasks`)}
+                className="text-green-600"
+              >
+                View Tasks
               </button>
             </div>
           </div>

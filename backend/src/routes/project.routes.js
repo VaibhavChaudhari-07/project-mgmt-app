@@ -19,5 +19,14 @@ router.delete("/:id", deleteProject);
 router.post("/:id/members", addMember);
 router.delete("/:id/members/:userId", removeMember);
 
+router.get("/:id", async (req, res) => {
+  const Project = require("../models/Project");
+  const project = await Project.findById(req.params.id).populate(
+    "members",
+    "name email"
+  );
+  res.json(project);
+});
+
 
 module.exports = router;
