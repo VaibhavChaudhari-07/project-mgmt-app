@@ -6,12 +6,13 @@ import Projects from "../pages/projects/Projects";
 import Members from "../pages/members/Members";
 import Settings from "../pages/settings/Settings";
 import Login from "../pages/auth/Login";
+import Register from "../pages/auth/Register";
+
 
 export const router = createBrowserRouter([
-  {
-    path: "/",
-    element: <Login />,
-  },
+  { path: "/", element: <Login /> },
+  { path: "/register", element: <Register /> },
+
   {
     path: "/",
     element: <ProtectedLayout />,

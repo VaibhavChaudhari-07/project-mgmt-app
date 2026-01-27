@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { api } from "../../services/api";
-import { useNavigate } from "react-router-dom";
-import { Link } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 
-
-export default function Login() {
+export default function Register() {
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
@@ -12,12 +11,11 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await api.post("/auth/login", { email, password });
-
-      localStorage.setItem("token", res.data.token);
-      navigate("/dashboard");
+      await api.post("/auth/register", { name, email, password });
+      alert("Registration successful. Please login.");
+      navigate("/");
     } catch (err) {
-      alert("Login failed");
+      alert(err.response?.data?.message || "Registration failed");
     }
   };
 
@@ -27,13 +25,22 @@ export default function Login() {
         onSubmit={handleSubmit}
         className="bg-white p-6 rounded shadow w-80"
       >
-        <h2 className="text-xl mb-4">Login</h2>
+        <h2 className="text-xl mb-4">Register</h2>
+
+        <input
+          className="border p-2 w-full mb-3"
+          placeholder="Name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+        />
 
         <input
           className="border p-2 w-full mb-3"
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          required
         />
 
         <input
@@ -42,15 +49,19 @@ export default function Login() {
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          required
         />
 
-        <button className="bg-blue-600 text-white w-full py-2">Login</button>
-        <p className="text-sm text-center mt-3">
-        Don't have an account?{" "}
-        <Link to="/register" className="text-blue-600">
+        <button className="bg-green-600 text-white w-full py-2 mb-3">
           Register
-        </Link>
-      </p>
+        </button>
+
+        <p className="text-sm text-center">
+          Already have an account?{" "}
+          <Link to="/" className="text-blue-600">
+            Login
+          </Link>
+        </p>
       </form>
     </div>
   );
