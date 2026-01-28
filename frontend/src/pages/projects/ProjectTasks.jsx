@@ -8,6 +8,10 @@ import {
 } from "../../services/task.service";
 import { getProjectById } from "../../services/project.service";
 import { getTeams } from "../../services/team.service";
+import {
+  getCommentsByTicket,
+  createComment,
+} from "../../services/comment.service";
 
 export default function ProjectTasks() {
   const { projectId } = useParams();
@@ -21,12 +25,21 @@ export default function ProjectTasks() {
   const [editTaskId, setEditTaskId] = useState(null);
 
   const [teams, setTeams] = useState([]);
-  const [openTeamId, setOpenTeamId] = useState(null);
   const [openDropdown, setOpenDropdown] = useState(false);
+
+  const [comments, setComments] = useState({});
+  const [commentText, setCommentText] = useState({});
+
+  const loadComments = async (taskId) => {
+    const res = await getCommentsByTicket(taskId);
+    setComments((prev) => ({ ...prev, [taskId]: res.data }));
+  };
 
   const loadTasks = async () => {
     const res = await getTasks(projectId);
-    setTasks(res.data || []);
+    const taskList = res.data || [];
+    setTasks(taskList);
+    taskList.forEach((t) => loadComments(t._id));
   };
 
   const loadMembers = async () => {
@@ -82,13 +95,25 @@ export default function ProjectTasks() {
 
   const toggleMember = (id) => {
     setSelectedAssignees((prev) =>
-      prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id],
+      prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]
     );
   };
 
   const assignTeam = (team) => {
     const teamIds = team.members.map((m) => m._id);
     setSelectedAssignees((prev) => Array.from(new Set([...prev, ...teamIds])));
+  };
+
+  const submitComment = async (taskId) => {
+    if (!commentText[taskId]?.trim()) return;
+
+    await createComment({
+      ticketId: taskId,
+      text: commentText[taskId],
+    });
+
+    setCommentText((prev) => ({ ...prev, [taskId]: "" }));
+    loadComments(taskId);
   };
 
   const selectedNames = members
@@ -100,7 +125,7 @@ export default function ProjectTasks() {
     <div>
       <h2 className="text-xl mb-3">Tasks</h2>
 
-      {/* Create / Edit task */}
+      {/* Create / Edit */}
       <div className="flex gap-2 mb-4 flex-wrap">
         <input
           className="border p-2"
@@ -119,7 +144,6 @@ export default function ProjectTasks() {
           <option value="high">High</option>
         </select>
 
-        {/* Assignee dropdown */}
         <div className="relative w-64">
           <button
             type="button"
@@ -131,7 +155,6 @@ export default function ProjectTasks() {
 
           {openDropdown && (
             <div className="absolute z-30 bg-white border w-full mt-1 max-h-64 overflow-y-auto shadow">
-              {/* Teams */}
               <div className="px-2 py-1 text-xs font-semibold text-gray-500 border-b">
                 Teams
               </div>
@@ -139,18 +162,15 @@ export default function ProjectTasks() {
               {teams
                 .filter((t) =>
                   t.members.every((m) =>
-                    members.some((pm) => pm._id === m._id),
-                  ),
+                    members.some((pm) => pm._id === m._id)
+                  )
                 )
                 .map((t) => (
-                  <label
-                    key={t._id}
-                    className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 cursor-pointer text-sm"
-                  >
+                  <label key={t._id} className="flex items-center gap-2 px-2 py-1 text-sm">
                     <input
                       type="checkbox"
                       checked={t.members.every((m) =>
-                        selectedAssignees.includes(m._id),
+                        selectedAssignees.includes(m._id)
                       )}
                       onChange={() => assignTeam(t)}
                     />
@@ -158,16 +178,12 @@ export default function ProjectTasks() {
                   </label>
                 ))}
 
-              {/* Members */}
               <div className="px-2 py-1 text-xs font-semibold text-gray-500 border-b mt-2">
                 Members
               </div>
 
               {members.map((m) => (
-                <label
-                  key={m._id}
-                  className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 cursor-pointer text-sm"
-                >
+                <label key={m._id} className="flex items-center gap-2 px-2 py-1 text-sm">
                   <input
                     type="checkbox"
                     checked={selectedAssignees.includes(m._id)}
@@ -185,7 +201,7 @@ export default function ProjectTasks() {
         </button>
       </div>
 
-      {/* Tasks table */}
+      {/* Tasks */}
       <table className="w-full border">
         <thead>
           <tr className="bg-gray-200">
@@ -198,42 +214,85 @@ export default function ProjectTasks() {
         </thead>
         <tbody>
           {tasks.map((t) => (
-            <tr key={t._id}>
-              <td className="border p-2">{t.title}</td>
+            <>
+              <tr key={t._id}>
+                <td className="border p-2">{t.title}</td>
 
-              <td className="border p-2">
-                <select
-                  className="border p-1"
-                  value={t.status}
-                  onChange={(e) => handleStatusChange(t._id, e.target.value)}
-                >
-                  <option value="todo">To Do</option>
-                  <option value="inprogress">In Progress</option>
-                  <option value="review">Review</option>
-                  <option value="done">Done</option>
-                </select>
-              </td>
+                <td className="border p-2">
+                  <select
+                    className="border p-1"
+                    value={t.status}
+                    onChange={(e) =>
+                      handleStatusChange(t._id, e.target.value)
+                    }
+                  >
+                    <option value="todo">To Do</option>
+                    <option value="inprogress">In Progress</option>
+                    <option value="review">Review</option>
+                    <option value="done">Done</option>
+                  </select>
+                </td>
 
-              <td className="border p-2">{t.priority}</td>
+                <td className="border p-2">{t.priority}</td>
 
-              <td className="border p-2">
-                {t.assignees?.length
-                  ? t.assignees.map((u) => u.name).join(", ")
-                  : "-"}
-              </td>
+                <td className="border p-2">
+                  {t.assignees?.length
+                    ? t.assignees.map((u) => u.name).join(", ")
+                    : "-"}
+                </td>
 
-              <td className="border p-2 flex gap-2">
-                <button onClick={() => startEdit(t)} className="text-blue-600">
-                  Edit
-                </button>
-                <button
-                  onClick={() => deleteTask(t._id).then(loadTasks)}
-                  className="text-red-600"
-                >
-                  Delete
-                </button>
-              </td>
-            </tr>
+                <td className="border p-2 flex gap-2">
+                  <button
+                    onClick={() => startEdit(t)}
+                    className="text-blue-600"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => deleteTask(t._id).then(loadTasks)}
+                    className="text-red-600"
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+
+              {/* COMMENTS ROW */}
+              <tr className="bg-gray-50">
+                <td colSpan="5" className="p-2">
+                  <div className="space-y-1 mb-2">
+                    {(comments[t._id] || []).map((c) => (
+                      <div key={c._id} className="text-sm">
+                        <b>{c.user.name}</b>: {c.text}
+                        <span className="text-xs text-gray-400 ml-2">
+                          {new Date(c.createdAt).toLocaleString()}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <input
+                      className="border p-1 flex-1 text-sm"
+                      placeholder="Write a comment..."
+                      value={commentText[t._id] || ""}
+                      onChange={(e) =>
+                        setCommentText((prev) => ({
+                          ...prev,
+                          [t._id]: e.target.value,
+                        }))
+                      }
+                    />
+                    <button
+                      onClick={() => submitComment(t._id)}
+                      className="bg-blue-500 text-white px-2 text-sm"
+                    >
+                      Send
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </>
           ))}
         </tbody>
       </table>
