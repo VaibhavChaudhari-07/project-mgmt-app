@@ -18,17 +18,23 @@ export default function ProjectTasks() {
 
   const [tasks, setTasks] = useState([]);
   const [members, setMembers] = useState([]);
+  const [teams, setTeams] = useState([]);
 
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState("medium");
   const [selectedAssignees, setSelectedAssignees] = useState([]);
   const [editTaskId, setEditTaskId] = useState(null);
 
-  const [teams, setTeams] = useState([]);
-  const [openDropdown, setOpenDropdown] = useState(false);
+  const [openAssignDropdown, setOpenAssignDropdown] = useState(false);
 
   const [comments, setComments] = useState({});
   const [commentText, setCommentText] = useState({});
+
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [priorityFilter, setPriorityFilter] = useState("");
+  const [assigneeFilter, setAssigneeFilter] = useState([]);
+  const [openFilterDropdown, setOpenFilterDropdown] = useState(false);
 
   const loadComments = async (taskId) => {
     const res = await getCommentsByTicket(taskId);
@@ -37,9 +43,9 @@ export default function ProjectTasks() {
 
   const loadTasks = async () => {
     const res = await getTasks(projectId);
-    const taskList = res.data || [];
-    setTasks(taskList);
-    taskList.forEach((t) => loadComments(t._id));
+    const list = res.data || [];
+    setTasks(list);
+    list.forEach((t) => loadComments(t._id));
   };
 
   const loadMembers = async () => {
@@ -93,39 +99,73 @@ export default function ProjectTasks() {
     loadTasks();
   };
 
-  const toggleMember = (id) => {
+  const toggleMemberAssign = (id) => {
     setSelectedAssignees((prev) =>
       prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]
     );
   };
 
   const assignTeam = (team) => {
-    const teamIds = team.members.map((m) => m._id);
-    setSelectedAssignees((prev) => Array.from(new Set([...prev, ...teamIds])));
+    const ids = team.members.map((m) => m._id);
+    setSelectedAssignees((prev) => Array.from(new Set([...prev, ...ids])));
   };
 
   const submitComment = async (taskId) => {
     if (!commentText[taskId]?.trim()) return;
 
-    await createComment({
-      ticketId: taskId,
-      text: commentText[taskId],
-    });
-
+    await createComment({ ticketId: taskId, text: commentText[taskId] });
     setCommentText((prev) => ({ ...prev, [taskId]: "" }));
     loadComments(taskId);
   };
+
+  // -------- FILTER LOGIC --------
+  const matchesAssigneeFilter = (task) => {
+    if (assigneeFilter.length === 0) return true;
+
+    return assigneeFilter.every((filter) => {
+      if (filter.startsWith("user:")) {
+        const userId = filter.replace("user:", "");
+        return task.assignees?.some((a) => a._id === userId);
+      }
+
+      if (filter.startsWith("team:")) {
+        const teamId = filter.replace("team:", "");
+        const team = teams.find((t) => t._id === teamId);
+        if (!team) return false;
+
+        const teamIds = team.members.map((m) => m._id);
+        const taskIds = (task.assignees || []).map((a) => a._id);
+
+        return teamIds.every((id) => taskIds.includes(id));
+      }
+
+      return true;
+    });
+  };
+
+  const filteredTasks = tasks.filter((task) => {
+    return (
+      task.title.toLowerCase().includes(search.toLowerCase()) &&
+      (!statusFilter || task.status === statusFilter) &&
+      (!priorityFilter || task.priority === priorityFilter) &&
+      matchesAssigneeFilter(task)
+    );
+  });
 
   const selectedNames = members
     .filter((m) => selectedAssignees.includes(m._id))
     .map((m) => m.name)
     .join(", ");
 
+  const validTeams = teams.filter((t) =>
+    t.members.every((tm) => members.some((pm) => pm._id === tm._id))
+  );
+
   return (
     <div>
       <h2 className="text-xl mb-3">Tasks</h2>
 
-      {/* Create / Edit */}
+      {/* Create Task */}
       <div className="flex gap-2 mb-4 flex-wrap">
         <input
           className="border p-2"
@@ -144,50 +184,44 @@ export default function ProjectTasks() {
           <option value="high">High</option>
         </select>
 
+        {/* Assign dropdown */}
         <div className="relative w-64">
           <button
-            type="button"
-            onClick={() => setOpenDropdown(!openDropdown)}
+            onClick={() => setOpenAssignDropdown(!openAssignDropdown)}
             className="border p-2 w-full text-left bg-white"
           >
             {selectedNames || "Assign users ▾"}
           </button>
 
-          {openDropdown && (
+          {openAssignDropdown && (
             <div className="absolute z-30 bg-white border w-full mt-1 max-h-64 overflow-y-auto shadow">
               <div className="px-2 py-1 text-xs font-semibold text-gray-500 border-b">
                 Teams
               </div>
 
-              {teams
-                .filter((t) =>
-                  t.members.every((m) =>
-                    members.some((pm) => pm._id === m._id)
-                  )
-                )
-                .map((t) => (
-                  <label key={t._id} className="flex items-center gap-2 px-2 py-1 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={t.members.every((m) =>
-                        selectedAssignees.includes(m._id)
-                      )}
-                      onChange={() => assignTeam(t)}
-                    />
-                    👥 {t.name}
-                  </label>
-                ))}
+              {validTeams.map((t) => (
+                <label key={t._id} className="flex gap-2 px-2 py-1 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={t.members.every((m) =>
+                      selectedAssignees.includes(m._id)
+                    )}
+                    onChange={() => assignTeam(t)}
+                  />
+                  👥 {t.name}
+                </label>
+              ))}
 
               <div className="px-2 py-1 text-xs font-semibold text-gray-500 border-b mt-2">
                 Members
               </div>
 
               {members.map((m) => (
-                <label key={m._id} className="flex items-center gap-2 px-2 py-1 text-sm">
+                <label key={m._id} className="flex gap-2 px-2 py-1 text-sm">
                   <input
                     type="checkbox"
                     checked={selectedAssignees.includes(m._id)}
-                    onChange={() => toggleMember(m._id)}
+                    onChange={() => toggleMemberAssign(m._id)}
                   />
                   {m.name}
                 </label>
@@ -201,7 +235,116 @@ export default function ProjectTasks() {
         </button>
       </div>
 
-      {/* Tasks */}
+      {/* FILTER BAR */}
+      <div className="flex gap-2 mb-3 flex-wrap">
+        <input
+          className="border p-2"
+          placeholder="Search..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+
+        <select
+          className="border p-2"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+        >
+          <option value="">All Status</option>
+          <option value="todo">To Do</option>
+          <option value="inprogress">In Progress</option>
+          <option value="review">Review</option>
+          <option value="done">Done</option>
+        </select>
+
+        <select
+          className="border p-2"
+          value={priorityFilter}
+          onChange={(e) => setPriorityFilter(e.target.value)}
+        >
+          <option value="">All Priority</option>
+          <option value="low">Low</option>
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+        </select>
+
+        {/* Assignee filter dropdown */}
+        <div className="relative w-64">
+          <button
+            onClick={() => setOpenFilterDropdown(!openFilterDropdown)}
+            className="border p-2 w-full text-left bg-white"
+          >
+            {assigneeFilter.length
+              ? `${assigneeFilter.length} selected`
+              : "Filter by assignee ▾"}
+          </button>
+
+          {openFilterDropdown && (
+            <div className="absolute z-30 bg-white border w-full mt-1 max-h-64 overflow-y-auto shadow">
+              <div className="px-2 py-1 text-xs font-semibold text-gray-500 border-b">
+                Teams
+              </div>
+
+              {validTeams.map((t) => {
+                const value = `team:${t._id}`;
+                return (
+                  <label key={t._id} className="flex gap-2 px-2 py-1 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={assigneeFilter.includes(value)}
+                      onChange={() =>
+                        setAssigneeFilter((prev) =>
+                          prev.includes(value)
+                            ? prev.filter((v) => v !== value)
+                            : [...prev, value]
+                        )
+                      }
+                    />
+                    👥 {t.name}
+                  </label>
+                );
+              })}
+
+              <div className="px-2 py-1 text-xs font-semibold text-gray-500 border-b mt-2">
+                Members
+              </div>
+
+              {members.map((m) => {
+                const value = `user:${m._id}`;
+                return (
+                  <label key={m._id} className="flex gap-2 px-2 py-1 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={assigneeFilter.includes(value)}
+                      onChange={() =>
+                        setAssigneeFilter((prev) =>
+                          prev.includes(value)
+                            ? prev.filter((v) => v !== value)
+                            : [...prev, value]
+                        )
+                      }
+                    />
+                    {m.name}
+                  </label>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <button
+          onClick={() => {
+            setSearch("");
+            setStatusFilter("");
+            setPriorityFilter("");
+            setAssigneeFilter([]);
+          }}
+          className="border px-3"
+        >
+          Clear
+        </button>
+      </div>
+
+      {/* TASK TABLE */}
       <table className="w-full border">
         <thead>
           <tr className="bg-gray-200">
@@ -213,14 +356,12 @@ export default function ProjectTasks() {
           </tr>
         </thead>
         <tbody>
-          {tasks.map((t) => (
+          {filteredTasks.map((t) => (
             <>
               <tr key={t._id}>
                 <td className="border p-2">{t.title}</td>
-
                 <td className="border p-2">
                   <select
-                    className="border p-1"
                     value={t.status}
                     onChange={(e) =>
                       handleStatusChange(t._id, e.target.value)
@@ -232,22 +373,14 @@ export default function ProjectTasks() {
                     <option value="done">Done</option>
                   </select>
                 </td>
-
                 <td className="border p-2">{t.priority}</td>
-
                 <td className="border p-2">
-                  {t.assignees?.length
-                    ? t.assignees.map((u) => u.name).join(", ")
-                    : "-"}
+                  {t.assignees?.map((u) => u.name).join(", ") || "-"}
                 </td>
-
-                <td className="border p-2 flex gap-2">
-                  <button
-                    onClick={() => startEdit(t)}
-                    className="text-blue-600"
-                  >
+                <td className="border p-2">
+                  <button onClick={() => startEdit(t)} className="text-blue-600">
                     Edit
-                  </button>
+                  </button>{" "}
                   <button
                     onClick={() => deleteTask(t._id).then(loadTasks)}
                     className="text-red-600"
@@ -257,24 +390,17 @@ export default function ProjectTasks() {
                 </td>
               </tr>
 
-              {/* COMMENTS ROW */}
               <tr className="bg-gray-50">
                 <td colSpan="5" className="p-2">
-                  <div className="space-y-1 mb-2">
-                    {(comments[t._id] || []).map((c) => (
-                      <div key={c._id} className="text-sm">
-                        <b>{c.user.name}</b>: {c.text}
-                        <span className="text-xs text-gray-400 ml-2">
-                          {new Date(c.createdAt).toLocaleString()}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+                  {(comments[t._id] || []).map((c) => (
+                    <div key={c._id} className="text-sm">
+                      <b>{c.user.name}</b>: {c.text}
+                    </div>
+                  ))}
 
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 mt-1">
                     <input
                       className="border p-1 flex-1 text-sm"
-                      placeholder="Write a comment..."
                       value={commentText[t._id] || ""}
                       onChange={(e) =>
                         setCommentText((prev) => ({
@@ -282,6 +408,7 @@ export default function ProjectTasks() {
                           [t._id]: e.target.value,
                         }))
                       }
+                      placeholder="Write a comment..."
                     />
                     <button
                       onClick={() => submitComment(t._id)}
