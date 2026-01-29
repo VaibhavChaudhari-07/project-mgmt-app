@@ -1,14 +1,12 @@
 const express = require("express");
 const router = express.Router();
-const auth = require("../middleware/auth.middleware");
+
 const {
   createComment,
-  getCommentsByTicket,
-} = require("../controllers/comment.controller");
-
-router.use(auth);
+  getCommentsByTicket
+} = require("../controllers/comment.controller"); // adjust path if needed
 
 router.post("/", createComment);
-router.get("/ticket/:ticketId", getCommentsByTicket);
+router.get("/:ticketId", getCommentsByTicket);
 
 module.exports = router;

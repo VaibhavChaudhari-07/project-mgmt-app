@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useContext } from "react";
 import { getDashboardSummary } from "../../services/dashboard.service";
 import {
   BarChart,
@@ -11,10 +11,11 @@ import {
   Cell,
   ResponsiveContainer,
 } from "recharts";
-
+import { LanguageContext } from "../../context/LanguageContext";
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
+  const { t } = useContext(LanguageContext);
 
   const loadData = async () => {
     const res = await getDashboardSummary();
@@ -39,20 +40,18 @@ export default function Dashboard() {
 
   return (
     <div>
-      <h1 className="text-2xl mb-4">Dashboard</h1>
+      <h1 className="text-2xl mb-4">{t("dashboard")}</h1>
 
-      {/* Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <Card title="Projects" value={data.totalProjects} />
-        <Card title="Tasks" value={data.totalTasks} />
-        <Card title="Completed" value={data.completedTasks} />
-        <Card title="Pending" value={data.pendingTasks} />
+        <Card title={t("projects")} value={data.totalProjects} />
+        <Card title={t("tasks")} value={data.totalTasks} />
+        <Card title={t("completed")} value={data.completedTasks} />
+        <Card title={t("pending")} value={data.pendingTasks} />
       </div>
 
-      {/* Charts */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div className="border p-4">
-          <h3 className="font-bold mb-2">Tasks by Status</h3>
+          <h3 className="font-bold mb-2">{t("tasksByStatus")}</h3>
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={statusData}>
               <XAxis dataKey="name" />
@@ -61,21 +60,13 @@ export default function Dashboard() {
               <Bar dataKey="value" />
             </BarChart>
           </ResponsiveContainer>
-
         </div>
 
         <div className="border p-4">
-          <h3 className="font-bold mb-2">Tasks by Priority</h3>
+          <h3 className="font-bold mb-2">{t("tasksByPriority")}</h3>
           <ResponsiveContainer width="100%" height={250}>
             <PieChart>
-              <Pie
-                data={priorityData}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                outerRadius={80}
-              >
+              <Pie data={priorityData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80}>
                 {priorityData.map((_, i) => (
                   <Cell key={i} />
                 ))}
@@ -83,13 +74,11 @@ export default function Dashboard() {
               <Tooltip />
             </PieChart>
           </ResponsiveContainer>
-
         </div>
       </div>
 
-      {/* Recent tasks */}
       <div className="border p-4">
-        <h3 className="font-bold mb-2">Recent Tasks</h3>
+        <h3 className="font-bold mb-2">{t("recentTasks")}</h3>
         <ul>
           {data.recentTasks.map((t) => (
             <li key={t._id} className="border-b py-1">

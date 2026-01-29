@@ -31,5 +31,10 @@ app.use("/api/teams", teamRoutes);
 
 app.use("/api/comments", commentRoutes);
 
+app.use("/api/activity", require("./routes/activity.routes"));
+
+app.use("/api/notifications", require("./routes/notification.routes"));
+
+
 module.exports = app;
 

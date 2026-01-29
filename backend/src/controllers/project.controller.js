@@ -1,7 +1,9 @@
 const Project = require("../models/Project");
 const Task = require("../models/Task");
+const User = require("../models/User");
+const { logActivity } = require("./activity.helper");
 
-
+/* ================= CREATE PROJECT ================= */
 exports.createProject = async (req, res) => {
   try {
     const { name, description } = req.body;
@@ -13,10 +15,11 @@ exports.createProject = async (req, res) => {
       members: [req.user.id],
     });
 
-    const populatedProject = await Project.findById(project._id).populate(
-      "members",
-      "name email"
-    );
+    await logActivity({
+      user: req.user.id,
+      action: `created project "${name}"`,
+      project: project._id,
+    });
 
     res.status(201).json(project);
   } catch (err) {
@@ -24,6 +27,7 @@ exports.createProject = async (req, res) => {
   }
 };
 
+/* ================= GET PROJECTS ================= */
 exports.getProjects = async (req, res) => {
   try {
     const projects = await Project.find({
@@ -38,6 +42,7 @@ exports.getProjects = async (req, res) => {
   }
 };
 
+/* ================= UPDATE PROJECT ================= */
 exports.updateProject = async (req, res) => {
   try {
     const { name, description } = req.body;
@@ -45,8 +50,14 @@ exports.updateProject = async (req, res) => {
     const project = await Project.findByIdAndUpdate(
       req.params.id,
       { name, description },
-      { new: true },
+      { new: true }
     );
+
+    await logActivity({
+      user: req.user.id,
+      action: `updated project "${project.name}"`,
+      project: project._id,
+    });
 
     res.json(project);
   } catch (err) {
@@ -54,17 +65,19 @@ exports.updateProject = async (req, res) => {
   }
 };
 
-
-
+/* ================= DELETE PROJECT ================= */
 exports.deleteProject = async (req, res) => {
   try {
-    const projectId = req.params.id;
+    const project = await Project.findById(req.params.id);
 
-    // Delete all tasks of this project
-    await Task.deleteMany({ project: projectId });
+    await Task.deleteMany({ project: project._id });
+    await Project.findByIdAndDelete(project._id);
 
-    // Delete the project
-    await Project.findByIdAndDelete(projectId);
+    await logActivity({
+      user: req.user.id,
+      action: `deleted project "${project.name}"`,
+      project: project._id,
+    });
 
     res.json({ message: "Project and related tasks deleted" });
   } catch (err) {
@@ -72,9 +85,7 @@ exports.deleteProject = async (req, res) => {
   }
 };
 
-
-const User = require("../models/User");
-
+/* ================= ADD MEMBER ================= */
 exports.addMember = async (req, res) => {
   try {
     const { email } = req.body;
@@ -90,33 +101,39 @@ exports.addMember = async (req, res) => {
     project.members.push(user._id);
     await project.save();
 
+    await logActivity({
+      user: req.user.id,
+      action: `added ${user.name} to project "${project.name}"`,
+      project: project._id,
+    });
+
     res.json({ message: "Member added" });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
-
+/* ================= UPDATE MEMBERS (BULK) ================= */
 exports.updateMembers = async (req, res) => {
   try {
     const { members } = req.body;
 
-    // Update project members
     const project = await Project.findByIdAndUpdate(
       req.params.id,
       { members },
       { new: true }
     ).populate("members", "name email");
 
-    // 🔒 Remove invalid assignees from all tasks of this project
     await Task.updateMany(
       { project: project._id },
-      {
-        $pull: {
-          assignees: { $nin: members },
-        },
-      }
+      { $pull: { assignees: { $nin: members } } }
     );
+
+    await logActivity({
+      user: req.user.id,
+      action: `updated members of project "${project.name}"`,
+      project: project._id,
+    });
 
     res.json(project);
   } catch (err) {
@@ -124,55 +141,30 @@ exports.updateMembers = async (req, res) => {
   }
 };
 
-
-
-
+/* ================= REMOVE MEMBER ================= */
 exports.removeMember = async (req, res) => {
   try {
     const project = await Project.findById(req.params.id);
-
-    const removedUserId = req.params.userId;
+    const removedUser = await User.findById(req.params.userId);
 
     project.members = project.members.filter(
-      (m) => m.toString() !== removedUserId
+      (m) => m.toString() !== req.params.userId
     );
 
     await project.save();
 
-    // 🔒 Remove user from all tasks in this project
     await Task.updateMany(
       { project: project._id },
-      {
-        $pull: {
-          assignees: removedUserId,
-        },
-      }
+      { $pull: { assignees: req.params.userId } }
     );
 
+    await logActivity({
+      user: req.user.id,
+      action: `removed ${removedUser.name} from project "${project.name}"`,
+      project: project._id,
+    });
+
     res.json({ message: "Member removed and cleaned from tasks" });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
-
-
-exports.updateTask = async (req, res) => {
-  try {
-    const updateData = {};
-
-    if (req.body.title !== undefined) updateData.title = req.body.title;
-    if (req.body.priority !== undefined) updateData.priority = req.body.priority;
-    if (req.body.status !== undefined) updateData.status = req.body.status;
-    if (req.body.assignees !== undefined) updateData.assignees = req.body.assignees;
-
-    const task = await Task.findByIdAndUpdate(
-      req.params.id,
-      updateData,
-      { new: true }
-    ).populate("assignees", "name email");
-
-    res.json(task);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

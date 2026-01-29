@@ -1,18 +1,40 @@
 const Task = require("../models/Task");
+const Notification = require("../models/Notification");
+const { logActivity } = require("./activity.helper");
 
-exports.createTask = async (req, res) => {
+/* ================= CREATE TASK ================= */
+const createTask = async (req, res) => {
   try {
     const task = await Task.create({
       title: req.body.title,
       priority: req.body.priority,
       status: req.body.status || "todo",
       project: req.body.project,
-      assignees: req.body.assignees || [],   // ✅ MULTI ASSIGNEE
+      assignees: req.body.assignees || [],
       createdBy: req.user.id,
     });
 
-    const populated = await Task.findById(task._id)
-      .populate("assignees", "name email");
+    const populated = await Task.findById(task._id).populate(
+      "assignees",
+      "name email"
+    );
+
+    await logActivity({
+      user: req.user.id,
+      action: `created task "${task.title}"`,
+      project: task.project,
+    });
+
+    for (const uid of task.assignees) {
+      await Notification.create({
+        user: uid,
+        message: `New task assigned: ${task.title}`,
+      });
+
+      global.io?.to(uid.toString()).emit("notification", {
+        message: `New task assigned: ${task.title}`,
+      });
+    }
 
     res.status(201).json(populated);
   } catch (err) {
@@ -20,10 +42,11 @@ exports.createTask = async (req, res) => {
   }
 };
 
-exports.getTasksByProject = async (req, res) => {
+/* ================= GET TASKS ================= */
+const getTasksByProject = async (req, res) => {
   try {
     const tasks = await Task.find({ project: req.params.projectId })
-      .populate("assignees", "name email")   // ✅ MULTI ASSIGNEE
+      .populate("assignees", "name email")
       .sort({ createdAt: -1 });
 
     res.json(tasks);
@@ -32,20 +55,29 @@ exports.getTasksByProject = async (req, res) => {
   }
 };
 
-exports.updateTask = async (req, res) => {
+/* ================= UPDATE TASK ================= */
+const updateTask = async (req, res) => {
   try {
-    const updateData = {};
+    const oldTask = await Task.findById(req.params.id);
+    if (!oldTask) return res.status(404).json({ message: "Task not found" });
 
-    if (req.body.title !== undefined) updateData.title = req.body.title;
-    if (req.body.priority !== undefined) updateData.priority = req.body.priority;
-    if (req.body.status !== undefined) updateData.status = req.body.status;
-    if (req.body.assignees !== undefined) updateData.assignees = req.body.assignees;
+    const task = await Task.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+    }).populate("assignees", "name email");
 
-    const task = await Task.findByIdAndUpdate(
-      req.params.id,
-      updateData,
-      { new: true }
-    ).populate("assignees", "name email");
+    if (req.body.status && oldTask.status !== req.body.status) {
+      await logActivity({
+        user: req.user.id,
+        action: `changed status of task "${task.title}" to ${task.status}`,
+        project: task.project,
+      });
+    } else {
+      await logActivity({
+        user: req.user.id,
+        action: `updated task "${task.title}"`,
+        project: task.project,
+      });
+    }
 
     res.json(task);
   } catch (err) {
@@ -53,12 +85,30 @@ exports.updateTask = async (req, res) => {
   }
 };
 
-
-exports.deleteTask = async (req, res) => {
+/* ================= DELETE TASK ================= */
+const deleteTask = async (req, res) => {
   try {
+    const task = await Task.findById(req.params.id);
+
     await Task.findByIdAndDelete(req.params.id);
+
+    if (task) {
+      await logActivity({
+        user: req.user.id,
+        action: `deleted task "${task.title}"`,
+        project: task.project,
+      });
+    }
+
     res.json({ message: "Task deleted" });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
+};
+
+module.exports = {
+  createTask,
+  getTasksByProject,
+  updateTask,
+  deleteTask,
 };
