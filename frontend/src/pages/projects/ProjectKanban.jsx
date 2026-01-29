@@ -39,8 +39,12 @@ function Column({ id, title, tasks }) {
 }
 
 function TaskCard({ task }) {
+  const user = JSON.parse(localStorage.getItem("user"));
+  const role = user?.role;
+  const canDrag = role === "admin" || role === "pm";
+
   const { attributes, listeners, setNodeRef, transform, transition } =
-    useSortable({ id: task._id });
+    useSortable({ id: task._id, disabled: !canDrag });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -51,9 +55,11 @@ function TaskCard({ task }) {
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
-      className="bg-white p-2 mb-2 rounded shadow cursor-move"
+      {...(canDrag ? attributes : {})}
+      {...(canDrag ? listeners : {})}
+      className={`bg-white p-2 mb-2 rounded shadow ${
+        canDrag ? "cursor-move" : "cursor-default opacity-80"
+      }`}
     >
       <div className="font-semibold">{task.title}</div>
       <div className="text-xs text-gray-500">
@@ -67,6 +73,11 @@ function TaskCard({ task }) {
 
 export default function ProjectKanban() {
   const { projectId } = useParams();
+
+  // 🔐 Role handling
+  const user = JSON.parse(localStorage.getItem("user"));
+  const role = user?.role;
+  const canUpdate = role === "admin" || role === "pm";
 
   const [tasks, setTasks] = useState([]);
   const [members, setMembers] = useState([]);
@@ -128,19 +139,18 @@ export default function ProjectKanban() {
     });
   };
 
-  const taskMatchesFilters = (task) => {
-    return (
-      task.title.toLowerCase().includes(search.toLowerCase()) &&
-      (!statusFilter || task.status === statusFilter) &&
-      (!priorityFilter || task.priority === priorityFilter) &&
-      matchesAssigneeFilter(task)
-    );
-  };
+  const taskMatchesFilters = (task) =>
+    task.title.toLowerCase().includes(search.toLowerCase()) &&
+    (!statusFilter || task.status === statusFilter) &&
+    (!priorityFilter || task.priority === priorityFilter) &&
+    matchesAssigneeFilter(task);
 
   const grouped = (status) =>
     tasks.filter((t) => t.status === status).filter(taskMatchesFilters);
 
   const handleDragEnd = async (event) => {
+    if (!canUpdate) return; // 🔒 members cannot move tasks
+
     const { active, over } = event;
     if (!over) return;
 
@@ -164,7 +174,7 @@ export default function ProjectKanban() {
 
   return (
     <div>
-      {/* Filters */}
+      {/* Filters (unchanged) */}
       <div className="flex gap-2 mb-4 flex-wrap">
         <input
           className="border p-2"
@@ -196,7 +206,6 @@ export default function ProjectKanban() {
           <option value="high">High</option>
         </select>
 
-        {/* Assignee filter dropdown */}
         <div className="relative w-64">
           <button
             onClick={() => setOpenAssigneeDropdown(!openAssigneeDropdown)}
@@ -216,10 +225,7 @@ export default function ProjectKanban() {
               {validTeams.map((t) => {
                 const value = `team:${t._id}`;
                 return (
-                  <label
-                    key={t._id}
-                    className="flex items-center gap-2 px-2 py-1 text-sm"
-                  >
+                  <label key={t._id} className="flex items-center gap-2 px-2 py-1 text-sm">
                     <input
                       type="checkbox"
                       checked={assigneeFilter.includes(value)}
@@ -237,10 +243,7 @@ export default function ProjectKanban() {
               {members.map((m) => {
                 const value = `user:${m._id}`;
                 return (
-                  <label
-                    key={m._id}
-                    className="flex items-center gap-2 px-2 py-1 text-sm"
-                  >
+                  <label key={m._id} className="flex items-center gap-2 px-2 py-1 text-sm">
                     <input
                       type="checkbox"
                       checked={assigneeFilter.includes(value)}

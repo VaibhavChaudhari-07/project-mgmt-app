@@ -137,8 +137,9 @@ export default function Members() {
             value={role}
             onChange={(e) => setRole(e.target.value)}
           >
-            <option value="member">Member</option>
-            <option value="admin">Admin</option>
+            <option value="member">Admin</option>
+            <option value="admin">Project Manager</option>
+            <option value="admin">Menber</option>
           </select>
 
           <button

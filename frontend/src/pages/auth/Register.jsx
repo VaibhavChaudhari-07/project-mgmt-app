@@ -6,12 +6,20 @@ export default function Register() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [role, setRole] = useState("member"); // 👈 new
+
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await api.post("/auth/register", { name, email, password });
+      await api.post("/auth/register", {
+        name,
+        email,
+        password,
+        role, // 👈 send role to backend
+      });
+
       alert("Registration successful. Please login.");
       navigate("/");
     } catch (err) {
@@ -51,6 +59,18 @@ export default function Register() {
           onChange={(e) => setPassword(e.target.value)}
           required
         />
+
+        {/* 👇 Role selection */}
+        <select
+          className="border p-2 w-full mb-3"
+          value={role}
+          onChange={(e) => setRole(e.target.value)}
+          required
+        >
+          <option value="member">Member</option>
+          <option value="pm">Project Manager</option>
+          <option value="admin">Admin</option>
+        </select>
 
         <button className="bg-green-600 text-white w-full py-2 mb-3">
           Register

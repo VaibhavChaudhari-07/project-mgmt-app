@@ -15,6 +15,13 @@ import { getTeams } from "../../services/team.service";
 export default function Projects() {
   const navigate = useNavigate();
 
+  // 🔐 role handling
+  const user = JSON.parse(localStorage.getItem("user"));
+  const role = user?.role;
+
+  const canManageProject = role === "admin" || role === "pm";
+  const canDeleteProject = role === "admin";
+
   const [projects, setProjects] = useState([]);
   const [users, setUsers] = useState([]);
 
@@ -69,7 +76,7 @@ export default function Projects() {
       setDescription("");
       setSelectedMembers([]);
 
-      await loadProjects(); // IMPORTANT
+      await loadProjects();
     } catch (err) {
       console.error("Project save failed:", err);
       alert("Failed to save project");
@@ -127,27 +134,29 @@ export default function Projects() {
       <h1 className="text-2xl mb-4">Projects</h1>
 
       {/* Create / Edit Project */}
-      <div className="mb-4 space-y-2">
-        <div className="flex gap-2">
-          <input
-            className="border p-2"
-            placeholder="Project name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
+      {canManageProject && (
+        <div className="mb-4 space-y-2">
+          <div className="flex gap-2">
+            <input
+              className="border p-2"
+              placeholder="Project name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
 
-          <input
-            className="border p-2"
-            placeholder="Description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
+            <input
+              className="border p-2"
+              placeholder="Description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
 
-          <button onClick={handleSave} className="bg-blue-600 text-white px-3">
-            {editId ? "Update" : "Add"}
-          </button>
+            <button onClick={handleSave} className="bg-blue-600 text-white px-3">
+              {editId ? "Update" : "Add"}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Project list */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -160,68 +169,70 @@ export default function Projects() {
               </div>
 
               {/* Members dropdown */}
-              <div className="relative">
-                <button
-                  onClick={() =>
-                    setOpenProjectDropdown(
-                      openProjectDropdown === p._id ? null : p._id,
-                    )
-                  }
-                  className="border px-2 py-1 text-sm bg-white"
-                >
-                  Members ▾
-                </button>
+              {canManageProject && (
+                <div className="relative">
+                  <button
+                    onClick={() =>
+                      setOpenProjectDropdown(
+                        openProjectDropdown === p._id ? null : p._id
+                      )
+                    }
+                    className="border px-2 py-1 text-sm bg-white"
+                  >
+                    Members ▾
+                  </button>
 
-                {openProjectDropdown === p._id && (
-                  <div className="absolute right-0 mt-1 w-60 bg-white border shadow z-20 max-h-60 overflow-y-auto">
-                    {/* Teams section */}
-                    <div className="px-2 py-1 text-xs font-semibold text-gray-500 border-b">
-                      Teams
-                    </div>
+                  {openProjectDropdown === p._id && (
+                    <div className="absolute right-0 mt-1 w-60 bg-white border shadow z-20 max-h-60 overflow-y-auto">
+                      <div className="px-2 py-1 text-xs font-semibold text-gray-500 border-b">
+                        Teams
+                      </div>
 
-                    {teams.map((t) => {
-                      const allTeamMembersSelected = t.members.every((tm) =>
-                        (p.members || []).some((pm) => pm._id === tm._id),
-                      );
+                      {teams.map((t) => {
+                        const allTeamMembersSelected = t.members.every((tm) =>
+                          (p.members || []).some((pm) => pm._id === tm._id)
+                        );
 
-                      return (
+                        return (
+                          <label
+                            key={t._id}
+                            className="flex items-center gap-2 px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={allTeamMembersSelected}
+                              onChange={() => assignTeamToProject(p._id, t)}
+                            />
+                            👥 {t.name}
+                          </label>
+                        );
+                      })}
+
+                      <div className="px-2 py-1 text-xs font-semibold text-gray-500 border-b mt-2">
+                        Members
+                      </div>
+
+                      {users.map((u) => (
                         <label
-                          key={t._id}
-                          className="flex items-center gap-2 px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                          key={u._id}
+                          className="flex items-center gap-2 p-2 hover:bg-gray-100 cursor-pointer text-sm"
                         >
                           <input
                             type="checkbox"
-                            checked={allTeamMembersSelected}
-                            onChange={() => assignTeamToProject(p._id, t)}
+                            checked={(p.members || []).some(
+                              (m) => m._id === u._id
+                            )}
+                            onChange={() =>
+                              toggleProjectMember(p._id, u._id)
+                            }
                           />
-                          👥 {t.name}
+                          {u.name}
                         </label>
-                      );
-                    })}
-
-                    {/* Members section */}
-                    <div className="px-2 py-1 text-xs font-semibold text-gray-500 border-b mt-2">
-                      Members
+                      ))}
                     </div>
-
-                    {users.map((u) => (
-                      <label
-                        key={u._id}
-                        className="flex items-center gap-2 p-2 hover:bg-gray-100 cursor-pointer text-sm"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={(p.members || []).some(
-                            (m) => m._id === u._id,
-                          )}
-                          onChange={() => toggleProjectMember(p._id, u._id)}
-                        />
-                        {u.name}
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Member badges */}
@@ -239,16 +250,23 @@ export default function Projects() {
 
             {/* Actions */}
             <div className="flex gap-3 mt-2">
-              <button onClick={() => startEdit(p)} className="text-blue-600">
-                Edit Project
-              </button>
+              {canManageProject && (
+                <button
+                  onClick={() => startEdit(p)}
+                  className="text-blue-600"
+                >
+                  Edit Project
+                </button>
+              )}
 
-              <button
-                onClick={() => deleteProject(p._id).then(loadProjects)}
-                className="text-red-600"
-              >
-                Delete Project
-              </button>
+              {canDeleteProject && (
+                <button
+                  onClick={() => deleteProject(p._id).then(loadProjects)}
+                  className="text-red-600"
+                >
+                  Delete Project
+                </button>
+              )}
 
               <button
                 onClick={() => navigate(`/projects/${p._id}/tasks`)}

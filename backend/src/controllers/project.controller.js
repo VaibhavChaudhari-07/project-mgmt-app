@@ -3,9 +3,18 @@ const Task = require("../models/Task");
 const User = require("../models/User");
 const { logActivity } = require("./activity.helper");
 
+/* ================= PERMISSION HELPERS ================= */
+
+const canManageProject = (role) => role === "admin" || role === "pm";
+const canDeleteProject = (role) => role === "admin";
+
 /* ================= CREATE PROJECT ================= */
 exports.createProject = async (req, res) => {
   try {
+    if (!canManageProject(req.user.role)) {
+      return res.status(403).json({ message: "Permission denied" });
+    }
+
     const { name, description } = req.body;
 
     const project = await Project.create({
@@ -17,7 +26,7 @@ exports.createProject = async (req, res) => {
 
     await logActivity({
       user: req.user.id,
-      action: `created project "${name}"`,
+      action: `you created project "${name}"`,
       project: project._id,
     });
 
@@ -45,6 +54,10 @@ exports.getProjects = async (req, res) => {
 /* ================= UPDATE PROJECT ================= */
 exports.updateProject = async (req, res) => {
   try {
+    if (!canManageProject(req.user.role)) {
+      return res.status(403).json({ message: "Permission denied" });
+    }
+
     const { name, description } = req.body;
 
     const project = await Project.findByIdAndUpdate(
@@ -55,7 +68,7 @@ exports.updateProject = async (req, res) => {
 
     await logActivity({
       user: req.user.id,
-      action: `updated project "${project.name}"`,
+      action: `you updated project "${project.name}"`,
       project: project._id,
     });
 
@@ -68,6 +81,10 @@ exports.updateProject = async (req, res) => {
 /* ================= DELETE PROJECT ================= */
 exports.deleteProject = async (req, res) => {
   try {
+    if (!canDeleteProject(req.user.role)) {
+      return res.status(403).json({ message: "Only admin can delete projects" });
+    }
+
     const project = await Project.findById(req.params.id);
 
     await Task.deleteMany({ project: project._id });
@@ -75,7 +92,7 @@ exports.deleteProject = async (req, res) => {
 
     await logActivity({
       user: req.user.id,
-      action: `deleted project "${project.name}"`,
+      action: `you deleted project "${project.name}"`,
       project: project._id,
     });
 
@@ -88,6 +105,10 @@ exports.deleteProject = async (req, res) => {
 /* ================= ADD MEMBER ================= */
 exports.addMember = async (req, res) => {
   try {
+    if (!canManageProject(req.user.role)) {
+      return res.status(403).json({ message: "Permission denied" });
+    }
+
     const { email } = req.body;
 
     const user = await User.findOne({ email });
@@ -103,7 +124,7 @@ exports.addMember = async (req, res) => {
 
     await logActivity({
       user: req.user.id,
-      action: `added ${user.name} to project "${project.name}"`,
+      action: `you added ${user.name} to project "${project.name}"`,
       project: project._id,
     });
 
@@ -116,6 +137,10 @@ exports.addMember = async (req, res) => {
 /* ================= UPDATE MEMBERS (BULK) ================= */
 exports.updateMembers = async (req, res) => {
   try {
+    if (!canManageProject(req.user.role)) {
+      return res.status(403).json({ message: "Permission denied" });
+    }
+
     const { members } = req.body;
 
     const project = await Project.findByIdAndUpdate(
@@ -131,7 +156,7 @@ exports.updateMembers = async (req, res) => {
 
     await logActivity({
       user: req.user.id,
-      action: `updated members of project "${project.name}"`,
+      action: `you updated members of project "${project.name}"`,
       project: project._id,
     });
 
@@ -144,6 +169,10 @@ exports.updateMembers = async (req, res) => {
 /* ================= REMOVE MEMBER ================= */
 exports.removeMember = async (req, res) => {
   try {
+    if (!canManageProject(req.user.role)) {
+      return res.status(403).json({ message: "Permission denied" });
+    }
+
     const project = await Project.findById(req.params.id);
     const removedUser = await User.findById(req.params.userId);
 
@@ -160,7 +189,7 @@ exports.removeMember = async (req, res) => {
 
     await logActivity({
       user: req.user.id,
-      action: `removed ${removedUser.name} from project "${project.name}"`,
+      action: `you removed ${removedUser.name} from project "${project.name}"`,
       project: project._id,
     });
 

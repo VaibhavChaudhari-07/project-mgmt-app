@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const auth = require("../middleware/auth.middleware");
+const { updateMembers } = require("../controllers/project.controller");
 const {
   createProject,
   getProjects,
@@ -18,7 +19,7 @@ router.put("/:id", updateProject);
 router.delete("/:id", deleteProject);
 router.post("/:id/members", addMember);
 router.delete("/:id/members/:userId", removeMember);
-const { updateMembers } = require("../controllers/project.controller");
+
 
 
 router.get("/:id", async (req, res) => {

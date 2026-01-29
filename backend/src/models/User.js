@@ -5,7 +5,13 @@ const userSchema = new mongoose.Schema(
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    role: { type: String, default: "user" },
+
+    // 👇 role based system
+    role: {
+      type: String,
+      enum: ["admin", "pm", "member"],
+      default: "member",
+    },
 
     preferences: {
       theme: { type: String, default: "light" },
@@ -19,7 +25,7 @@ const userSchema = new mongoose.Schema(
       projectUpdates: { type: Boolean, default: true },
     },
   },
-  { timestamps: true },
+  { timestamps: true }
 );
 
 module.exports = mongoose.model("User", userSchema);
