@@ -226,3 +226,15 @@ Key notes from `frontend/README.md`:
 - Guidance about expanding ESLint when using TypeScript and links to the Vite TypeScript template.
 
 If you prefer, the original `frontend/README.md` can be removed; its content is now included here.
+
+---
+
+## 🖼 Architecture Diagrams
+
+Below is the role-based flow diagram illustrating Admin / Project Manager / Member actions and the resulting notifications/activity log flows.
+
+<p align="center">
+  <img src="backend/role%20based%20flow%20diagram.jpeg" alt="RBAC role based flow diagram" style="max-width:100%;height:auto;" />
+</p>
+
+*Image source: `backend/role based flow diagram.jpeg`*
