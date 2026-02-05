@@ -3,6 +3,9 @@ import { api } from "./api";
 export const getTasks = (projectId) =>
   api.get(`/tasks/project/${projectId}`);
 
+export const getMyTasks = () =>
+  api.get(`/tasks/my/assigned`);
+
 export const createTask = (data) =>
   api.post("/tasks", data);
 

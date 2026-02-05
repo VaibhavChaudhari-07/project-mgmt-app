@@ -24,6 +24,9 @@ const userSchema = new mongoose.Schema(
       newComment: { type: Boolean, default: true },
       projectUpdates: { type: Boolean, default: true },
     },
+
+    // 👇 required users for task assignment (persisted per user)
+    requiredUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   },
   { timestamps: true }
 );

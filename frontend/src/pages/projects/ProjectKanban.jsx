@@ -10,7 +10,9 @@ import { CSS } from "@dnd-kit/utilities";
 
 import { getTasks, updateTask } from "../../services/task.service";
 import { getProjectById } from "../../services/project.service";
+import { canChangeIssueStatus } from "../../services/permissions";
 import { getTeams } from "../../services/team.service";
+import { getRequiredUsers } from "../../services/user.service";
 
 const columns = [
   { key: "todo", label: "To Do" },
@@ -19,37 +21,112 @@ const columns = [
   { key: "done", label: "Done" },
 ];
 
-function Column({ id, title, tasks }) {
+/* 🔹 STATUS COLUMN UI STYLES (UI ONLY) */
+const columnStyles = {
+  todo: {
+    bg: "bg-blue-50",
+    border: "border-blue-200",
+    header: "text-blue-700",
+  },
+  inprogress: {
+    bg: "bg-yellow-50",
+    border: "border-yellow-200",
+    header: "text-yellow-700",
+  },
+  review: {
+    bg: "bg-purple-50",
+    border: "border-purple-200",
+    header: "text-purple-700",
+  },
+  done: {
+    bg: "bg-green-50",
+    border: "border-green-200",
+    header: "text-green-700",
+  },
+};
+
+/* ================= COLUMN ================= */
+
+function Column({ id, title, tasks, projectPermissions }) {
   const { setNodeRef } = useDroppable({ id });
+  const style = columnStyles[id];
 
   return (
-    <div ref={setNodeRef} className="bg-gray-100 p-2 rounded min-h-[400px]">
-      <h3 className="text-center font-bold mb-2">{title}</h3>
+    <div
+      ref={setNodeRef}
+      className={`
+        ${style.bg}
+        border
+        ${style.border}
+        rounded-xl
+        p-3
+        flex
+        flex-col
+        min-h-[75vh]
+      `}
+    >
+      {/* COLUMN HEADER */}
+      <h3
+        className={`
+          text-sm
+          font-semibold
+          mb-3
+          sticky
+          top-0
+          z-10
+          ${style.header}
+        `}
+      >
+        {title}
+      </h3>
 
       <SortableContext
         items={tasks.map((t) => t._id)}
         strategy={verticalListSortingStrategy}
       >
-        {tasks.map((task) => (
-          <TaskCard key={task._id} task={task} />
-        ))}
+        <div className="flex flex-col gap-3">
+          {tasks.map((task) => (
+            <TaskCard key={task._id} task={task} projectPermissions={projectPermissions} />
+          ))}
+        </div>
       </SortableContext>
     </div>
   );
 }
 
-function TaskCard({ task }) {
+/* ================= TASK CARD ================= */
+
+function TaskCard({ task, projectPermissions = {} }) {
   const user = JSON.parse(localStorage.getItem("user"));
   const role = user?.role;
-  const canDrag = role === "admin" || role === "pm";
+  const canDrag = canChangeIssueStatus(user, projectPermissions);
 
-  const { attributes, listeners, setNodeRef, transform, transition } =
-    useSortable({ id: task._id, disabled: !canDrag });
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: task._id, disabled: !canDrag });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
   };
+
+  const priorityStyle = {
+    high: "bg-red-100 text-red-700",
+    medium: "bg-yellow-100 text-yellow-700",
+    low: "bg-green-100 text-green-700",
+  };
+
+  const avatar = (name) =>
+    name
+      ?.split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase();
 
   return (
     <div
@@ -57,38 +134,58 @@ function TaskCard({ task }) {
       style={style}
       {...(canDrag ? attributes : {})}
       {...(canDrag ? listeners : {})}
-      className={`bg-white p-2 mb-2 rounded shadow ${
-        canDrag ? "cursor-move" : "cursor-default opacity-80"
-      }`}
+      className={`rounded-lg bg-white p-3 shadow-sm border transition-all
+        ${canDrag ? "cursor-grab" : "cursor-default"}
+        ${isDragging ? "shadow-lg scale-[1.02]" : "hover:shadow-md"}
+      `}
     >
-      <div className="font-semibold">{task.title}</div>
-      <div className="text-xs text-gray-500">
-        {task.assignees?.length
-          ? task.assignees.map((u) => u.name).join(", ")
-          : "Unassigned"}
+      {/* TASK TITLE */}
+      <div className="font-medium text-sm text-gray-800 mb-2">
+        {task.title}
+      </div>
+
+      {/* PRIORITY */}
+      <span
+        className={`inline-block text-xs px-2 py-0.5 rounded mb-2 ${priorityStyle[task.priority]}`}
+      >
+        {task.priority.toUpperCase()}
+      </span>
+
+      {/* ASSIGNEES */}
+      <div className="flex items-center gap-1 mt-2 flex-wrap">
+        {(task.assignees || []).length === 0 ? (
+          <span className="text-xs text-gray-400">Unassigned</span>
+        ) : (
+          task.assignees.map((u) => (
+            <div
+              key={u._id}
+              title={u.name}
+              className="w-7 h-7 rounded-full bg-purple-600 text-white flex items-center justify-center text-xs font-semibold"
+            >
+              {avatar(u.name)}
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
 }
 
+/* ================= MAIN ================= */
+
 export default function ProjectKanban() {
   const { projectId } = useParams();
 
-  // 🔐 Role handling
   const user = JSON.parse(localStorage.getItem("user"));
   const role = user?.role;
-  const canUpdate = role === "admin" || role === "pm";
 
   const [tasks, setTasks] = useState([]);
-  const [members, setMembers] = useState([]);
+  const [requiredUsers, setRequiredUsers] = useState([]);
   const [teams, setTeams] = useState([]);
+  const [projectPermissions, setProjectPermissions] = useState({});
 
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [priorityFilter, setPriorityFilter] = useState("");
-
-  const [assigneeFilter, setAssigneeFilter] = useState([]);
-  const [openAssigneeDropdown, setOpenAssigneeDropdown] = useState(false);
+  // compute permissions after projectPermissions state is declared
+  const canUpdate = canChangeIssueStatus(user, projectPermissions);
 
   const loadTasks = async () => {
     const res = await getTasks(projectId);
@@ -96,8 +193,17 @@ export default function ProjectKanban() {
   };
 
   const loadMembers = async () => {
-    const res = await getProjectById(projectId);
-    setMembers(res.data.members || []);
+    try {
+      const res = await getProjectById(projectId);
+      setProjectPermissions(res.data.permissions || {});
+      
+      // Load required users from backend API
+      const requiredUsersRes = await getRequiredUsers();
+      setRequiredUsers(requiredUsersRes.data || []);
+    } catch (err) {
+      console.error("Error loading members:", err);
+      setRequiredUsers([]);
+    }
   };
 
   const loadTeams = async () => {
@@ -111,45 +217,11 @@ export default function ProjectKanban() {
     loadTeams();
   }, [projectId]);
 
-  const validTeams = teams.filter((t) =>
-    t.members.every((tm) => members.some((pm) => pm._id === tm._id))
-  );
-
-  const matchesAssigneeFilter = (task) => {
-    if (assigneeFilter.length === 0) return true;
-
-    return assigneeFilter.every((filter) => {
-      if (filter.startsWith("user:")) {
-        const userId = filter.replace("user:", "");
-        return task.assignees?.some((a) => a._id === userId);
-      }
-
-      if (filter.startsWith("team:")) {
-        const teamId = filter.replace("team:", "");
-        const team = validTeams.find((t) => t._id === teamId);
-        if (!team) return false;
-
-        const teamIds = team.members.map((m) => m._id);
-        const taskIds = (task.assignees || []).map((a) => a._id);
-
-        return teamIds.every((id) => taskIds.includes(id));
-      }
-
-      return true;
-    });
-  };
-
-  const taskMatchesFilters = (task) =>
-    task.title.toLowerCase().includes(search.toLowerCase()) &&
-    (!statusFilter || task.status === statusFilter) &&
-    (!priorityFilter || task.priority === priorityFilter) &&
-    matchesAssigneeFilter(task);
-
   const grouped = (status) =>
-    tasks.filter((t) => t.status === status).filter(taskMatchesFilters);
+    tasks.filter((t) => t.status === status);
 
   const handleDragEnd = async (event) => {
-    if (!canUpdate) return; // 🔒 members cannot move tasks
+    if (!canUpdate) return;
 
     const { active, over } = event;
     if (!over) return;
@@ -164,122 +236,19 @@ export default function ProjectKanban() {
     loadTasks();
   };
 
-  const toggleAssigneeFilter = (value) => {
-    setAssigneeFilter((prev) =>
-      prev.includes(value)
-        ? prev.filter((v) => v !== value)
-        : [...prev, value]
-    );
-  };
-
   return (
     <div>
-      {/* Filters (unchanged) */}
-      <div className="flex gap-2 mb-4 flex-wrap">
-        <input
-          className="border p-2"
-          placeholder="Search task..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-
-        <select
-          className="border p-2"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          <option value="">All Status</option>
-          <option value="todo">To Do</option>
-          <option value="inprogress">In Progress</option>
-          <option value="review">Review</option>
-          <option value="done">Done</option>
-        </select>
-
-        <select
-          className="border p-2"
-          value={priorityFilter}
-          onChange={(e) => setPriorityFilter(e.target.value)}
-        >
-          <option value="">All Priority</option>
-          <option value="low">Low</option>
-          <option value="medium">Medium</option>
-          <option value="high">High</option>
-        </select>
-
-        <div className="relative w-64">
-          <button
-            onClick={() => setOpenAssigneeDropdown(!openAssigneeDropdown)}
-            className="border p-2 w-full text-left bg-white"
-          >
-            {assigneeFilter.length
-              ? `${assigneeFilter.length} selected`
-              : "Filter by assignee ▾"}
-          </button>
-
-          {openAssigneeDropdown && (
-            <div className="absolute z-30 bg-white border w-full mt-1 max-h-64 overflow-y-auto shadow">
-              <div className="px-2 py-1 text-xs font-semibold text-gray-500 border-b">
-                Teams
-              </div>
-
-              {validTeams.map((t) => {
-                const value = `team:${t._id}`;
-                return (
-                  <label key={t._id} className="flex items-center gap-2 px-2 py-1 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={assigneeFilter.includes(value)}
-                      onChange={() => toggleAssigneeFilter(value)}
-                    />
-                    👥 {t.name}
-                  </label>
-                );
-              })}
-
-              <div className="px-2 py-1 text-xs font-semibold text-gray-500 border-b mt-2">
-                Members
-              </div>
-
-              {members.map((m) => {
-                const value = `user:${m._id}`;
-                return (
-                  <label key={m._id} className="flex items-center gap-2 px-2 py-1 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={assigneeFilter.includes(value)}
-                      onChange={() => toggleAssigneeFilter(value)}
-                    />
-                    {m.name}
-                  </label>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        <button
-          onClick={() => {
-            setSearch("");
-            setStatusFilter("");
-            setPriorityFilter("");
-            setAssigneeFilter([]);
-          }}
-          className="border px-3"
-        >
-          Clear
-        </button>
-      </div>
-
-      <h2 className="text-xl mb-4">Kanban Board</h2>
+      <h2 className="text-xl font-semibold mb-4">Kanban Board</h2>
 
       <DndContext onDragEnd={handleDragEnd}>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           {columns.map((col) => (
             <Column
               key={col.key}
               id={col.key}
               title={col.label}
               tasks={grouped(col.key)}
+              projectPermissions={projectPermissions}
             />
           ))}
         </div>

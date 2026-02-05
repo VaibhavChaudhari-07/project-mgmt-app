@@ -1,7 +1,9 @@
 const Comment = require("../models/Comment");
 const Task = require("../models/Task");
+const User = require("../models/User");
 const Notification = require("../models/Notification");
 const { logActivity } = require("./activity.helper");
+const { sendNotifications } = require("../helpers/notification.helper");
 
 /* ================= PERMISSION HELPERS ================= */
 
@@ -45,14 +47,28 @@ exports.createComment = async (req, res) => {
         project: task.project,
       });
 
-      for (const uid of task.assignees) {
-        await Notification.create({
-          user: uid,
-          message: `New comment on task "${task.title}"`,
-        });
+      // Notify all assignees except commenter
+      const commentersToNotify = task.assignees.filter(
+        (uid) => uid.toString() !== req.user.id.toString()
+      );
 
-        global.io?.to(uid.toString()).emit("notification");
+      if (commentersToNotify.length > 0) {
+        const commenterUser = await User.findById(req.user.id);
+        const assigneeNames = task.assignees.length === 1 ? "yourself" : "the team";
+        
+        await sendNotifications(
+          commentersToNotify,
+          `${commenterUser.name} commented: "${text}" on task "${task.title}"`,
+          "comment",
+          "Comments"
+        );
       }
+
+      global.io?.to(req.user.id.toString()).emit("notification", {
+        message: `Comment added`,
+        type: "comment",
+        tab: "Comments",
+      });
     }
 
     res.status(201).json(populated);

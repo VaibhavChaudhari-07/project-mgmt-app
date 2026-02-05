@@ -31,9 +31,28 @@ exports.createUser = async (req, res) => {
 
 exports.updateUser = async (req, res) => {
   try {
-    const user = await User.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-    }).select("-password");
+    const { role, name, email } = req.body;
+
+    // only admin & pm can update roles
+    if (role) {
+      if (req.user.role === "member") {
+        return res.status(403).json({ message: "Permission denied" });
+      }
+
+      // pm cannot change admin
+      const target = await User.findById(req.params.id);
+      if (!target) return res.status(404).json({ message: "User not found" });
+
+      if (req.user.role === "pm" && target.role !== "member") {
+        return res.status(403).json({ message: "Permission denied" });
+      }
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { name, email, role },
+      { new: true }
+    ).select("-password");
 
     res.json(user);
   } catch (err) {
@@ -66,15 +85,25 @@ exports.getMe = async (req, res) => {
 
 exports.updateMe = async (req, res) => {
   try {
-    const { name } = req.body;
+    const { name, email } = req.body;
 
     const user = await require("../models/User").findById(req.user.id);
 
     if (!user) return res.status(404).json({ message: "User not found" });
 
     if (name) user.name = name;
+    if (email) user.email = email;
 
     await user.save();
+
+    // Send notification for profile update
+    const { sendNotification } = require("../helpers/notification.helper");
+    await sendNotification(
+      req.user.id,
+      "Your profile was updated",
+      "user_invitation",
+      "Project Invitation"
+    );
 
     res.json({
       message: "Profile updated",
@@ -82,8 +111,19 @@ exports.updateMe = async (req, res) => {
         _id: user._id,
         name: user.name,
         email: user.email,
+        role: user.role
       },
     });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+
+exports.deleteMe = async (req, res) => {
+  try {
+    await User.findByIdAndDelete(req.user.id);
+    res.json({ message: "Account deleted successfully" });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

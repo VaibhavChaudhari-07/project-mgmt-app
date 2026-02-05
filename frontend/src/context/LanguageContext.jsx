@@ -13,6 +13,7 @@ const translations = {
     notifications: "Notifications",
     activity: "Activity",
     settingsTitle: "Settings",
+    welcomeBack: "welcome back",
   },
   hi: {
     dashboard: "डैशबोर्ड",
@@ -24,6 +25,7 @@ const translations = {
     notifications: "सूचनाएं",
     activity: "गतिविधि",
     settingsTitle: "सेटिंग्स",
+    welcomeBack: "वापसी पर स्वागत है",
   },
 };
 

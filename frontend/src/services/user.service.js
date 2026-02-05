@@ -9,3 +9,7 @@ export const getMe = () => api.get("/users/me");
 
 export const updateProfile = (data) =>
   api.put("/users/me", data);
+
+export const getRequiredUsers = () => api.get("/users/me/required-users");
+export const updateRequiredUsers = (userIds) =>
+  api.put("/users/me/required-users", { userIds });

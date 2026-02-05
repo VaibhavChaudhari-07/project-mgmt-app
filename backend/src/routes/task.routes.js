@@ -5,6 +5,7 @@ const auth = require("../middleware/auth.middleware");
 const {
   createTask,
   getTasksByProject,
+  getMyTasks,
   updateTask,
   deleteTask,
   updateTaskStatusByMember, // 👈 new
@@ -19,6 +20,7 @@ router.delete("/:id", deleteTask);
 
 // All members
 router.get("/project/:projectId", getTasksByProject);
+router.get("/my/assigned", getMyTasks);
 
 // Member status-only update
 router.patch("/:id/status", updateTaskStatusByMember);
