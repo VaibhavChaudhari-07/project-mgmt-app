@@ -135,7 +135,7 @@ export default function Members() {
   const validTeams = teams.filter(isTeamValid);
 
   return (
-    <div className="p-6">
+    <div className="p-6 pt-16">
       <h1 className="text-3xl font-bold mb-6">Team & Project Members</h1>
 
       {/* Only show for admin/pm */}

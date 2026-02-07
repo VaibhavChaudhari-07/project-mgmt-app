@@ -86,7 +86,7 @@ export default function MyTasks() {
   };
 
   return (
-    <div className="max-w-4xl">
+    <div className="p-6 pt-16 max-w-4xl">
       <div className="mb-6">
         <h2 className="text-2xl font-bold mb-2">My Tasks</h2>
         <p className="text-gray-600 dark:text-gray-400">

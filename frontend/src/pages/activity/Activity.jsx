@@ -81,7 +81,7 @@ export default function Activity() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6 pt-16">
       <div className="max-w-4xl mx-auto h-screen flex flex-col">
         <div className="mb-6">
           <h2 className="text-3xl font-bold text-gray-900 mb-2">📊 Activity History</h2>

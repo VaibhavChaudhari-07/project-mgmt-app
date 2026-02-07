@@ -29,6 +29,7 @@ export default function ProjectTasks() {
 
   // Use required users from localStorage instead of project members
   const [requiredUsers, setRequiredUsers] = useState([]);
+  const [projectMembers, setProjectMembers] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [teams, setTeams] = useState([]);
 
@@ -82,6 +83,8 @@ export default function ProjectTasks() {
 
   const loadMembers = async () => {
     const res = await getProjectById(projectId);
+    // Set project members for assignee dropdown
+    setProjectMembers(res.data.members || []);
     // Load required users from backend
     try {
       const requiredRes = await getRequiredUsers();
@@ -104,15 +107,15 @@ export default function ProjectTasks() {
     loadTeams();
   }, [projectId]);
 
-  // Check if all team members are in required users
+  // Check if all team members are in project members
   const isTeamValid = (team) => {
     if (!team.members || team.members.length === 0) return false;
     return team.members.every((member) =>
-      requiredUsers.some((ru) => ru._id === member._id)
+      projectMembers.some((pm) => pm._id === member._id)
     );
   };
 
-  // Filter teams to show only valid ones (all members in required users)
+  // Filter teams to show only valid ones (all members in project members)
   const validTeams = teams.filter(isTeamValid);
 
   /* ---------------- TASK CRUD ---------------- */
@@ -202,7 +205,7 @@ export default function ProjectTasks() {
   /* ---------------- UI ---------------- */
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 pt-16">
       <div className="max-w-7xl mx-auto">
         <h2 className="text-3xl font-bold text-gray-900 mb-8">📋 Project Tasks</h2>
 
@@ -244,16 +247,16 @@ export default function ProjectTasks() {
                   Members
                 </div>
 
-                {requiredUsers.length === 0 ? (
+                {projectMembers.length === 0 ? (
                   <div className="px-3 py-2 text-xs text-gray-400 italic">
-                    No required users added. Go to Members tab to add users.
+                    No members assigned to this project.
                   </div>
                 ) : (
                   (() => {
                     // find the task being edited (if any) so we can disable its creator checkbox
                     const editingTask = tasks.find((t) => t._id === editTaskId);
 
-                    return requiredUsers.map((m) => {
+                    return projectMembers.map((m) => {
                       const isCreator = !!(
                         editingTask &&
                         (editingTask.createdBy === m._id ||
@@ -295,20 +298,20 @@ export default function ProjectTasks() {
                   Teams
                 </div>
 
-                {requiredUsers.length === 0 ? (
+                {projectMembers.length === 0 ? (
                   <div className="px-3 py-2 text-xs text-gray-400 italic">
-                    Add required users first to see teams.
+                    Add members to project to see teams.
                   </div>
                 ) : validTeams.length === 0 ? (
                   <div className="px-3 py-2 text-xs text-gray-400 italic">
-                    No teams available. Create teams with members in required users section.
+                    No teams available. Create teams with members in this project.
                   </div>
                 ) : (
                   validTeams.map((team) => {
-                    // determine if all team members are part of required users
-                    const requiredUserIds = new Set((requiredUsers || []).map((m) => String(m._id)));
+                    // determine if all team members are part of project members
+                    const projectMemberIds = new Set((projectMembers || []).map((m) => String(m._id)));
                     const teamMemberIds = (team.members || []).map((m) => String(m._id));
-                    const allInRequired = teamMemberIds.every((id) => requiredUserIds.has(id));
+                    const allInProject = teamMemberIds.every((id) => projectMemberIds.has(id));
 
                     return (
                       <div key={team._id} className="flex items-center justify-between px-3 py-2 text-sm hover:bg-gray-50">
@@ -318,15 +321,15 @@ export default function ProjectTasks() {
                         </div>
                         <button
                           onClick={() => {
-                            if (!allInRequired) return;
-                            // add team members to selectedAssignees (only those in required users)
-                            const toAdd = teamMemberIds.filter((id) => requiredUserIds.has(id));
+                            if (!allInProject) return;
+                            // add team members to selectedAssignees (only those in project)
+                            const toAdd = teamMemberIds.filter((id) => projectMemberIds.has(id));
                             setSelectedAssignees((prev) => Array.from(new Set([...prev, ...toAdd])));
                           }}
-                          className={`px-2 py-1 rounded text-xs ${allInRequired ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}
-                          disabled={!allInRequired}
+                          className={`px-2 py-1 rounded text-xs ${allInProject ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}
+                          disabled={!allInProject}
                         >
-                          {allInRequired ? "Add Team" : "Unavailable"}
+                          {allInProject ? "Add Team" : "Unavailable"}
                         </button>
                       </div>
                     );
@@ -370,7 +373,7 @@ export default function ProjectTasks() {
               );
             })()}
             {/* HEADER */}
-            <div className="pb-2">
+            <div className="pt-10 pb-2">
               <h3 className="font-bold text-lg text-gray-900 mb-3 line-clamp-2 hover:text-blue-600 transition">{t.title}</h3>
 
               {/* STATUS */}

@@ -13,7 +13,17 @@ const commentRoutes = require("./routes/comment.routes");
 
 const app = express();
 
-app.use(cors());
+
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "https://project-mgmt-app-frontend.onrender.com",
+    ],
+    credentials: true,
+  })
+);
+
 app.use(express.json());
 
 app.use("/api/auth", authRoutes);

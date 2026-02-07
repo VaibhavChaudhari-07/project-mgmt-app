@@ -64,7 +64,7 @@ export default function Profile() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6 pt-16">
       <div className="max-w-md mx-auto">
         {!profile ? (
           <div className="text-center text-gray-500">No profile data</div>

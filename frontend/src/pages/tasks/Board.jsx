@@ -79,7 +79,7 @@ export default function Board() {
 
   return (
     <div>
-      <div className="mb-6">
+      <div className="p-6 pt-16 mb-6">
         <h2 className="text-2xl font-bold mb-2">Board</h2>
         <p className="text-gray-600 dark:text-gray-400">
           Kanban board view of tasks assigned to you

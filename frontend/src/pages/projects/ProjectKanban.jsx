@@ -238,7 +238,7 @@ export default function ProjectKanban() {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold mb-4">Kanban Board</h2>
+      <h2 className="p-6 pt-16 text-xl font-semibold mb-4">Kanban Board</h2>
 
       <DndContext onDragEnd={handleDragEnd}>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

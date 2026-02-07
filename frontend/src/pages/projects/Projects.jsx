@@ -166,7 +166,7 @@ export default function Projects() {
   /* ---------------- UI ---------------- */
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
+    <div className="p-6 pt-16 bg-gray-50 min-h-screen">
       <h1 className="text-2xl font-semibold mb-6">Projects</h1>
 
       {/* CREATE PROJECT */}
@@ -219,7 +219,7 @@ export default function Projects() {
             })()}
             {/* HEADER */}
             <div>
-              <h2 className="font-bold text-xl mb-2 text-gray-900">{p.name}</h2>
+              <h2 className="pt-12 font-bold text-xl mb-2 text-gray-900">{p.name}</h2>
               <p className="text-sm text-gray-600 mb-4 line-clamp-2">
                 {p.description || "No description provided"}
               </p>
